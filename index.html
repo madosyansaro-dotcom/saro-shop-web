@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
-    <script src="config.js?v=17"></script> 
+    <script src="config.js?v=18"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -21,7 +21,7 @@
         <i class="fas fa-user"></i>
     </div>
 
-    <div id="admin-toggle" class="fixed top-28 left-4 mt-2 z-40 bg-red-600 p-3 rounded-full shadow-lg hidden text-white cursor-pointer transition-colors" onclick="toggleAdminMode()">
+    <div id="admin-toggle" class="fixed top-20 left-4 mt-2 z-40 bg-red-600 p-3 rounded-full shadow-lg hidden text-white cursor-pointer transition-colors" onclick="toggleAdminMode()">
         <i class="fas fa-hammer"></i>
     </div>
 
@@ -127,21 +127,12 @@
                 const res = await fetchWithRetry(API_URL + "/api/admins", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const admins = await res.json();
                 const userId = tg.initDataUnsafe?.user?.id;
-                
                 isAdmin = admins.map(String).includes(String(userId));
-                
-                // 🔥 ДИАГНОСТИКА: покажет, видит ли тебя Telegram 🔥
-                if (!isAdmin) {
-                    tg.showAlert(`Диагностика:\nТвой ID: ${userId}\nАдмины в БД: ${admins.join(', ')}`);
-                }
                 
                 if(isAdmin) {
                     document.getElementById('admin-toggle').classList.remove('hidden');
                 }
-            } catch(e) { 
-                console.error("Admin check failed", e); 
-                tg.showAlert("Бэкенд недоступен! Проверь, работает ли Python и правильная ли ссылка ngrok в config.js");
-            }
+            } catch(e) { console.error("Admin check failed", e); }
             
             await loadProducts();
         }
@@ -175,7 +166,6 @@
 
         window.renderProducts = () => {
             const query = document.getElementById('search-input').value.toLowerCase().trim();
-            // 🔥 Защита от undefined в поиске 🔥
             const filteredProducts = allProducts.filter(p => String(p.name || '').toLowerCase().includes(query));
             const listEl = document.getElementById('products-list');
 
@@ -186,13 +176,11 @@
             
             listEl.innerHTML = filteredProducts.map(p => `
                 <div class="relative bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-2xl flex justify-between items-center border border-[var(--tg-theme-bg-color,#374151)] ${isAdmin && adminEditMode ? 'admin-edit' : ''}">
-                    
                     ${isAdmin && adminEditMode ? `
                         <button onclick="confirmDelete(${p.id})" class="absolute top-2 left-2 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg border border-red-300 active:scale-90 z-10">
                             <i class="fas fa-minus text-xs"></i>
                         </button>
                     ` : ''}
-
                     <div class="ml-2 ${isAdmin && adminEditMode ? 'pl-8' : ''}">
                         <h2 class="font-bold text-sm">${escapeHTML(p.name)}</h2>
                         <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-xs">${p.price} руб. | В наличии: ${p.qty}</p>
@@ -280,7 +268,8 @@
         
         window.closeCart = () => document.getElementById('cart-modal').classList.add('hidden');
         
-        window.sendOrder = () => {
+        // 🔥 НОВЫЙ МЕТОД ОТПРАВКИ ЗАКАЗОВ ЧЕРЕЗ РЕАЛЬНЫЙ API 🔥
+        window.sendOrder = async () => {
             if(cart.length > 0) {
                 const phone = localStorage.getItem('saro_shop_phone') || "";
                 const address = localStorage.getItem('saro_shop_address') || "";
@@ -295,14 +284,41 @@
 
                 tg.MainButton.showProgress();
                 
-                setTimeout(() => {
-                    tg.sendData(JSON.stringify({ cart, phone, address }));
-                    cart = [];
-                    localStorage.removeItem('saro_shop_cart');
-                    updateCartUI();
-                    closeCart();
+                const payload = {
+                    cart: cart,
+                    phone: phone,
+                    address: address,
+                    user_id: tg.initDataUnsafe?.user?.id || 0
+                };
+
+                try {
+                    const res = await fetch(`${API_URL}/api/orders`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'ngrok-skip-browser-warning': 'true'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        cart = [];
+                        localStorage.removeItem('saro_shop_cart');
+                        updateCartUI();
+                        closeCart();
+                        tg.showAlert("✅ Заказ успешно оформлен!", () => {
+                            tg.close(); // Изящно закрываем Mini App после успеха
+                        });
+                    } else {
+                        const errorData = await res.json();
+                        tg.showAlert(errorData.detail || "Ошибка при оформлении заказа");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    tg.showAlert("Ошибка сети при отправке заказа");
+                } finally {
                     tg.MainButton.hideProgress();
-                }, 500);
+                }
             }
         };
 
