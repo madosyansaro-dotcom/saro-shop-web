@@ -82,8 +82,21 @@
 
         window.deleteProduct = async (id) => {
             if (!confirm("Удалить товар из магазина?")) return;
-            await fetch(`${NGROK_URL}/api/products/${id}`, { method: 'DELETE' });
-            loadProducts();
+            try {
+                // Добавляем заголовок 'ngrok-skip-browser-warning' и принудительный режим
+                const response = await fetch(`${NGROK_URL}/api/products/${id}`, { 
+                    method: 'DELETE',
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                
+                if (response.ok) {
+                    loadProducts();
+                } else {
+                    alert("Ошибка при удалении товара.");
+                }
+            } catch (err) {
+                console.error("Ошибка сети:", err);
+            }
         };
 
         window.removeFromCart = (id) => {
