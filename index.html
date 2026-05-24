@@ -68,7 +68,7 @@
                     
                     container.innerHTML += `
                         <div class="relative bg-gray-800 p-4 rounded-xl flex justify-between items-center border border-gray-700 shadow-md">
-                            ${isAdmin ? `<button onclick="deleteProduct(${p.id})" class="absolute -top-2 -left-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg"><i class="fas fa-minus"></i></button>` : ''}
+                            ${isAdmin ? `<button onclick="deleteProduct(${p.id})" class="bg-red-600 text-white w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-700"><i class="fas fa-trash"></i></button>` : ''}
                             <div>
                                 <h2 class="font-bold text-lg">${p.name}</h2>
                                 <p class="text-gray-400 text-sm">${p.price} руб.</p>
@@ -76,9 +76,9 @@
                             </div>
                             <button id="btn-${p.id}" 
                                 onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.qty})"
-                                class="px-4 py-2 rounded-lg font-bold transition-all ${isOut ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 text-black active:scale-95'}"
+                                class="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-xl transition-all ${isOut ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 text-black active:scale-95'}"
                                 ${isOut ? 'disabled' : ''}>
-                                ${isOut ? 'Пусто' : '+ Добавить'}
+                                +
                             </button>
                         </div>
                     `;
