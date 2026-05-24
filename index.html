@@ -76,8 +76,22 @@
 
         window.addToCart = (id, name, price, maxQty) => {
             let item = cart.find(i => i.id === id);
-            if (!item) cart.push({id, name, price, qty: 1});
-            else if (item.qty < maxQty) item.qty++;
+            let currentQty = item ? item.qty : 0;
+
+            // ПРОВЕРКА: Если в корзине уже товаров столько же или больше, чем есть на складе
+            if (currentQty >= maxQty) {
+                alert("Больше этого товара нет в наличии!");
+                return; // Прерываем выполнение, ничего не добавляем
+            }
+
+            if (!item) {
+                cart.push({id, name, price, qty: 1});
+            } else {
+                item.qty++;
+            }
+            
+            // Вибрация при каждом успешном нажатии
+            tg.HapticFeedback.impactOccurred("medium");
             updateCartUI();
         };
 
