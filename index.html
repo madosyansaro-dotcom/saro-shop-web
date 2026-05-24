@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
-    <script src="config.js?v=11"></script> 
+    <script src="config.js?v=13"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -91,12 +91,21 @@
         
         let cart = [], isAdmin = false, itemToDelete = null;
 
+        // 🔥 XSS Protection with default parameter
+        const escapeHTML = (str = '') => String(str).replace(/[&<>'"]/g, 
+            tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag])
+        );
+
         async function initApp() {
             tg.ready();
             
             const savedCart = localStorage.getItem('saro_shop_cart');
             if (savedCart) {
-                cart = JSON.parse(savedCart);
+                try {
+                    cart = JSON.parse(savedCart);
+                } catch {
+                    cart = [];
+                }
                 updateCartUI();
             }
 
@@ -125,13 +134,17 @@
                     <div class="relative bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-2xl flex justify-between items-center border border-[var(--tg-theme-bg-color,#374151)] ${isAdmin ? 'admin-edit' : ''}">
                         ${isAdmin ? `<button onclick="confirmDelete(${p.id})" class="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg border border-red-300 active:scale-90 z-10"><i class="fas fa-minus text-xs"></i></button>` : ''}
                         <div class="ml-2">
-                            <h2 class="font-bold text-sm">${p.name}</h2>
+                            <h2 class="font-bold text-sm">${escapeHTML(p.name)}</h2>
                             <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-xs">${p.price} руб. | В наличии: ${p.qty}</p>
                         </div>
-                        <button class="w-10 h-10 bg-[var(--tg-theme-button-color,#2563eb)] rounded-xl text-[var(--tg-theme-button-text-color,#ffffff)] font-bold text-xl" onclick="addToCart(${p.id}, '${encodeURIComponent(p.name)}', ${p.price}, ${p.qty})">+</button>
+                        <button class="w-10 h-10 bg-[var(--tg-theme-button-color,#2563eb)] rounded-xl text-[var(--tg-theme-button-text-color,#ffffff)] font-bold text-xl ${p.qty <= 0 ? 'opacity-50 cursor-not-allowed' : ''}" 
+                                onclick="addToCart(${p.id}, '${encodeURIComponent(p.name)}', ${p.price}, ${p.qty})" ${p.qty <= 0 ? 'disabled' : ''}>+</button>
                     </div>
                 `).join('');
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e); 
+                document.getElementById("loader").innerHTML = `<div class="text-center text-red-500 py-10">Ошибка загрузки</div>`;
+            }
         }
 
         window.confirmDelete = (id) => {
@@ -150,7 +163,7 @@
                 tg.HapticFeedback.impactOccurred("heavy"); 
                 loadProducts(); 
             } else { 
-                alert("Ошибка удаления"); 
+                tg.showAlert("Ошибка удаления"); 
             }
             itemToDelete = null;
         };
@@ -158,7 +171,10 @@
         window.addToCart = (id, encodedName, price, maxQty) => {
             const name = decodeURIComponent(encodedName);
             let item = cart.find(i => i.id === id);
-            if ((item ? item.qty : 0) >= maxQty) { alert("Товара больше нет!"); return; }
+            if ((item ? item.qty : 0) >= maxQty) { 
+                tg.showAlert("Больше этого товара нет в наличии!"); 
+                return; 
+            }
             if (!item) cart.push({id, name, price, qty: 1}); else item.qty++;
             tg.HapticFeedback.impactOccurred("medium");
             updateCartUI();
@@ -181,34 +197,46 @@
 
         window.renderCart = () => {
             const container = document.getElementById('cart-items');
-            container.innerHTML = cart.length === 0 ? '<p class="text-[var(--tg-theme-hint-color)]">Корзина пуста</p>' : cart.map(i => `<div class="flex justify-between bg-[var(--tg-theme-bg-color,#111827)] p-3 rounded items-center border border-[var(--tg-theme-secondary-bg-color,#374151)]"><span>${i.name} (x${i.qty})</span><button class="text-red-500" onclick="removeFromCart(${i.id})"><i class="fas fa-trash"></i></button></div>`).join('');
+            container.innerHTML = cart.length === 0 ? '<p class="text-[var(--tg-theme-hint-color)]">Корзина пуста</p>' : cart.map(i => `<div class="flex justify-between bg-[var(--tg-theme-bg-color,#111827)] p-3 rounded items-center border border-[var(--tg-theme-secondary-bg-color,#374151)]"><span>${escapeHTML(i.name)} (x${i.qty})</span><button class="text-red-500" onclick="removeFromCart(${i.id})"><i class="fas fa-trash"></i></button></div>`).join('');
         };
+
         window.renderCartTotal = () => {
+            if(cart.length === 0) {
+                document.getElementById('cart-total').innerHTML = "";
+                return;
+            }
             const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
             document.getElementById('cart-total').innerHTML = `<div class="text-xl font-bold text-[var(--tg-theme-button-color,#4ade80)] mt-4">Итого: ${total} ₽</div>`;
         };
 
         window.openCart = () => { document.getElementById('cart-modal').classList.remove('hidden'); renderCart(); renderCartTotal(); };
-        window.removeFromCart = (id) => { cart = cart.filter(i => i.id !== id); updateCartUI(); renderCart(); renderCartTotal(); };
+        
+        window.removeFromCart = (id) => { 
+            cart = cart.filter(i => i.id !== id); 
+            tg.HapticFeedback.impactOccurred("light");
+            updateCartUI(); 
+            renderCart(); 
+            renderCartTotal(); 
+        };
+        
         window.closeCart = () => document.getElementById('cart-modal').classList.add('hidden');
         
-        // --- ЗАКАЗ С НОВЫМ PAYLOAD ---
         window.sendOrder = () => {
             if(cart.length > 0) {
                 const phone = localStorage.getItem('saro_shop_phone') || "";
                 const address = localStorage.getItem('saro_shop_address') || "";
                 
                 if(phone.length < 10 || address.length < 5) {
-                    alert("Пожалуйста, заполните телефон и адрес в Личном кабинете перед заказом!");
-                    closeCart();
-                    openProfile();
+                    tg.showAlert("Пожалуйста, заполните телефон и адрес в Личном кабинете перед заказом!", () => {
+                        closeCart();
+                        openProfile();
+                    });
                     return;
                 }
 
                 tg.MainButton.showProgress();
                 
                 setTimeout(() => {
-                    // Отправляем объект с корзиной, телефоном и адресом
                     tg.sendData(JSON.stringify({ cart, phone, address }));
                     
                     cart = [];
@@ -223,7 +251,6 @@
         tg.MainButton.offClick(window.sendOrder);
         tg.MainButton.onClick(window.sendOrder);
 
-        // --- ПРОФИЛЬ И ВАЛИДАЦИЯ ---
         window.openProfile = () => {
             document.getElementById('profile-name').innerText = tg.initDataUnsafe?.user?.first_name || "Пользователь";
             document.getElementById('profile-id').innerText = tg.initDataUnsafe?.user?.id || "---";
@@ -241,11 +268,11 @@
             const address = document.getElementById('profile-address').value.trim();
             
             if (phone.length < 10) {
-                alert("Введите корректный номер телефона");
+                tg.showAlert("Введите корректный номер телефона");
                 return;
             }
             if (address.length < 5) {
-                alert("Введите полный адрес доставки");
+                tg.showAlert("Введите полный адрес доставки");
                 return;
             }
             
