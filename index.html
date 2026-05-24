@@ -29,14 +29,28 @@
         let isAdmin = false;
 
         async function initApp() {
-            // Узнаем, админ ли текущий пользователь
             try {
-                const res = await fetch(NGROK_URL + "/api/admins");
-                const admins = await res.json();
-                const userId = tg.initDataUnsafe.user.id;
-                isAdmin = admins.includes(userId);
-            } catch (e) { console.error("Admin check failed"); }
+                // Запрашиваем список админов
+                const res = await fetch(NGROK_URL + "/api/admins", {
+                    headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                
+                // Получаем список от Python
+                const admins = await res.json(); 
+                
+                // Берем твой ID из самого Telegram
+                const user = tg.initDataUnsafe?.user; 
+                
+                if (user) {
+                    // Превращаем все ID в числа для точного сравнения
+                    const adminIds = admins.map(id => Number(id));
+                    isAdmin = adminIds.includes(Number(user.id));
+                }
+            } catch (e) { 
+                console.error("Ошибка проверки прав:", e); 
+            }
             
+            // Загружаем товары только после проверки прав
             loadProducts();
         }
 
