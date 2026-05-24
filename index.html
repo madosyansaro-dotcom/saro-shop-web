@@ -11,34 +11,63 @@
 
     <h1 class="text-2xl font-bold text-center text-green-400 mb-6">🛒 Продукты</h1>
 
-    <div class="space-y-4">
-        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
-            <div>
-                <h2 class="font-bold text-lg">Хлеб фермерский</h2>
-                <p class="text-gray-400 text-sm">Цена: 80 руб.</p>
-            </div>
-            <button class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" onclick="addToCart('Хлеб фермерский', 80)">+ Добавить</button>
-        </div>
-
-        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
-            <div>
-                <h2 class="font-bold text-lg">Молоко 1л</h2>
-                <p class="text-gray-400 text-sm">Цена: 120 руб.</p>
-            </div>
-            <button class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" onclick="addToCart('Молоко 1л', 120)">+ Добавить</button>
-        </div>
+    <div id="products-list" class="space-y-4">
+        <p class="text-center text-gray-400 animate-pulse">Загрузка товаров из базы...</p>
     </div>
 
     <button id="checkoutBtn" class="w-full mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl hidden transition-all shadow-lg" onclick="sendOrder()">
-        Оформить заказ
+        Оформить заказ на <span id="totalPrice">0</span> руб.
     </button>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let cart = []; // Корзина
+        // 🔥 ВСТАВЬ СЮДА СВОЮ ССЫЛКУ ОТ NGROK
+        const NGROK_URL = "https://sappiness-lyrically-icky.ngrok-free.dev"; 
+
+        let cart = []; 
         let checkoutBtn = document.getElementById('checkoutBtn');
+        let totalPriceSpan = document.getElementById('totalPrice');
+
+        // Функция загрузки товаров с твоего ПК
+        async function loadProducts() {
+            try {
+                // Добавляем /api/products к ссылке ngrok
+                const response = await fetch(NGROK_URL + "/api/products", {
+                    method: 'GET',
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true' // Обходим экран предупреждения ngrok
+                    }
+                });
+                const products = await response.json();
+                
+                const container = document.getElementById('products-list');
+                container.innerHTML = ''; // Очищаем надпись "Загрузка..."
+
+                if (products.length === 0) {
+                    container.innerHTML = '<p class="text-center text-gray-400">Товаров пока нет. Добавьте их через админку!</p>';
+                    return;
+                }
+
+                // Рисуем карточку для каждого товара из базы
+                products.forEach(p => {
+                    container.innerHTML += `
+                        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
+                            <div>
+                                <h2 class="font-bold text-lg">${p.name}</h2>
+                                <p class="text-gray-400 text-sm">Цена: ${p.price} руб.</p>
+                                <p class="text-gray-500 text-xs">В наличии: ${p.qty} шт.</p>
+                            </div>
+                            <button class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" 
+                                onclick="addToCart('${p.name}', ${p.price})">+ Добавить</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                document.getElementById('products-list').innerHTML = '<p class="text-center text-red-500">Ошибка связи с сервером магазина.</p>';
+            }
+        }
 
         function addToCart(name, price) {
             let existing = cart.find(i => i.name === name);
@@ -48,16 +77,25 @@
                 cart.push({ name: name, price: price, qty: 1 });
             }
             
-            // Показываем кнопку оформления
-            checkoutBtn.style.display = 'block';
+            updateCheckoutButton();
             tg.HapticFeedback.impactOccurred('light');
         }
 
+        function updateCheckoutButton() {
+            let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            if (total > 0) {
+                checkoutBtn.style.display = 'block';
+                totalPriceSpan.innerText = total;
+            }
+        }
+
         function sendOrder() {
-            // Отправляем JSON корзины обратно в Python-бота
             let dataString = JSON.stringify(cart);
             tg.sendData(dataString); 
         }
+
+        // Запускаем загрузку товаров при открытии приложения
+        loadProducts();
     </script>
 </body>
 </html>
