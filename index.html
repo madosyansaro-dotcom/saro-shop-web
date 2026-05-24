@@ -4,41 +4,104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
-    <script src="config.js"></script> 
+    <script src="config.js?v=11"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @keyframes wiggle { 0% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } 100% { transform: rotate(-1.5deg); } }
+        .admin-edit { animation: wiggle 0.8s infinite; }
+        @keyframes pulse-bg { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .skeleton { animation: pulse-bg 1.5s infinite; background: var(--tg-theme-secondary-bg-color, #374151); }
+    </style>
 </head>
-<body class="bg-gray-900 text-white p-4 font-sans select-none">
+<body class="bg-[var(--tg-theme-bg-color,#111827)] text-[var(--tg-theme-text-color,#ffffff)] p-4 font-sans select-none">
 
-    <div id="cart-float" class="fixed top-4 right-4 z-50 bg-blue-600 p-3 rounded-full shadow-lg hidden" onclick="openCart()">
-        <i class="fas fa-shopping-cart"></i>
-        <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-xs w-5 h-5 flex items-center justify-center rounded-full">0</span>
+    <div class="fixed top-4 left-4 z-50 bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-full shadow-lg text-[var(--tg-theme-button-color,#3b82f6)]" onclick="openProfile()">
+        <i class="fas fa-user"></i>
     </div>
 
-    <h1 class="text-2xl font-bold text-center text-green-400 mb-6">🛒 Продукты</h1>
+    <div id="cart-float" class="fixed top-4 right-4 z-50 bg-[var(--tg-theme-button-color,#2563eb)] p-3 rounded-full shadow-lg hidden text-[var(--tg-theme-button-text-color,#ffffff)]" onclick="openCart()">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-xs w-5 h-5 flex items-center justify-center rounded-full text-white">0</span>
+    </div>
 
-    <div id="products-list" class="space-y-3"></div>
+    <h1 class="text-2xl font-bold text-center text-[var(--tg-theme-button-color,#4ade80)] mb-6">🛒 Продукты</h1>
 
-    <div id="cart-modal" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 hidden p-4">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold">Ваша корзина</h2>
-            <button onclick="closeCart()" class="text-gray-400"><i class="fas fa-times text-2xl"></i></button>
+    <div id="loader" class="space-y-4">
+        <div class="h-20 skeleton rounded-2xl"></div>
+        <div class="h-20 skeleton rounded-2xl"></div>
+        <div class="h-20 skeleton rounded-2xl"></div>
+    </div>
+    <div id="products-list" class="space-y-4"></div>
+
+    <div id="cart-modal" onclick="if(event.target === this) closeCart()" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-50 hidden p-4 flex flex-col justify-end pb-10">
+        <div class="bg-[var(--tg-theme-bg-color,#111827)] w-full rounded-3xl p-5 shadow-2xl border border-[var(--tg-theme-secondary-bg-color,#374151)] max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Ваша корзина</h2>
+                <button onclick="closeCart()" class="text-[var(--tg-theme-hint-color,#9ca3af)]"><i class="fas fa-times text-2xl"></i></button>
+            </div>
+            <div id="cart-items" class="space-y-3"></div>
+            <div id="cart-total" class="mt-4"></div>
         </div>
-        <div id="cart-items" class="space-y-3"></div>
-        <button class="w-full mt-6 bg-green-600 py-3 rounded-xl font-bold" onclick="sendOrder()">Оформить заказ</button>
+    </div>
+
+    <div id="profile-modal" onclick="if(event.target === this) closeProfile()" class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-50 hidden p-4 flex flex-col justify-end pb-10">
+        <div class="bg-[var(--tg-theme-bg-color,#111827)] w-full rounded-3xl p-5 shadow-2xl border border-[var(--tg-theme-secondary-bg-color,#374151)]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-[var(--tg-theme-button-color,#4ade80)]">👤 Личный кабинет</h2>
+                <button onclick="closeProfile()" class="text-[var(--tg-theme-hint-color,#9ca3af)]"><i class="fas fa-times text-2xl"></i></button>
+            </div>
+            
+            <div class="bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-5 rounded-2xl border border-[var(--tg-theme-bg-color,#374151)] space-y-3">
+                <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-sm mb-0">Имя:</p>
+                <p id="profile-name" class="text-lg font-bold mb-2">Загрузка...</p>
+                
+                <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-sm mb-0">Telegram ID:</p>
+                <p id="profile-id" class="text-lg font-bold mb-4">Загрузка...</p>
+                
+                <hr class="border-[var(--tg-theme-bg-color,#374151)] my-4">
+                
+                <label class="block text-[var(--tg-theme-hint-color,#9ca3af)] text-sm mb-1">Телефон:</label>
+                <input type="tel" id="profile-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-[var(--tg-theme-bg-color,#111827)] text-[var(--tg-theme-text-color,#fff)] p-3 rounded-xl border border-[var(--tg-theme-secondary-bg-color,#374151)] outline-none focus:border-[var(--tg-theme-button-color,#2563eb)] mb-3">
+                
+                <label class="block text-[var(--tg-theme-hint-color,#9ca3af)] text-sm mb-1">Адрес доставки:</label>
+                <textarea id="profile-address" rows="2" placeholder="Город, Улица, Дом..." class="w-full bg-[var(--tg-theme-bg-color,#111827)] text-[var(--tg-theme-text-color,#fff)] p-3 rounded-xl border border-[var(--tg-theme-secondary-bg-color,#374151)] outline-none focus:border-[var(--tg-theme-button-color,#2563eb)] mb-4"></textarea>
+                
+                <button onclick="saveProfileData()" class="w-full bg-[var(--tg-theme-button-color,#2563eb)] py-3 rounded-xl font-bold text-[var(--tg-theme-button-text-color,#ffffff)] active:scale-95">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal" onclick="if(event.target === this) closeDeleteModal()" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-6 rounded-2xl w-full max-w-sm text-center border border-gray-700 shadow-2xl">
+            <div class="text-red-500 text-4xl mb-3"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3 class="text-xl font-bold mb-2">Удалить товар?</h3>
+            <p class="text-[var(--tg-theme-hint-color,#9ca3af)] mb-6 text-sm">Это действие полностью удалит товар из ассортимента.</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 bg-[var(--tg-theme-bg-color,#374151)] py-3 rounded-xl font-bold">Отмена</button>
+                <button onclick="executeDelete()" class="flex-1 bg-red-600 py-3 rounded-xl font-bold text-white active:scale-95">Удалить</button>
+            </div>
+        </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp; 
         tg.expand();
         
-        let cart = [], isAdmin = false;
+        let cart = [], isAdmin = false, itemToDelete = null;
 
         async function initApp() {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            tg.ready();
+            
+            const savedCart = localStorage.getItem('saro_shop_cart');
+            if (savedCart) {
+                cart = JSON.parse(savedCart);
+                updateCartUI();
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 800));
             try {
-                // Используем API_URL из config.js
                 const res = await fetch(API_URL + "/api/admins", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const admins = await res.json();
                 const userId = tg.initDataUnsafe?.user?.id;
@@ -51,95 +114,146 @@
             try {
                 const res = await fetch(API_URL + "/api/products", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const products = await res.json();
-                const list = document.getElementById('products-list');
+                document.getElementById("loader").style.display = "none";
                 
-                list.innerHTML = products.map(p => `
-                    <div class="bg-gray-800 p-3 rounded-lg flex justify-between items-center border border-gray-700">
-                        <div class="flex items-center gap-2">
-                            <button id="del-${p.id}" onclick="deleteProduct(${p.id})" class="text-red-500 w-8 h-8 ${isAdmin ? '' : 'hidden'}">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <div>
-                                <h2 class="font-bold text-sm">${p.name}</h2>
-                                <p class="text-gray-400 text-xs">${p.price} руб. | В наличии: ${p.qty}</p>
-                            </div>
+                if(products.length === 0) {
+                    document.getElementById('products-list').innerHTML = `<div class="text-center text-[var(--tg-theme-hint-color,#9ca3af)] py-20"><div class="text-5xl mb-4">🛒</div><p>Товары отсутствуют</p></div>`;
+                    return;
+                }
+                
+                document.getElementById('products-list').innerHTML = products.map(p => `
+                    <div class="relative bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-2xl flex justify-between items-center border border-[var(--tg-theme-bg-color,#374151)] ${isAdmin ? 'admin-edit' : ''}">
+                        ${isAdmin ? `<button onclick="confirmDelete(${p.id})" class="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg border border-red-300 active:scale-90 z-10"><i class="fas fa-minus text-xs"></i></button>` : ''}
+                        <div class="ml-2">
+                            <h2 class="font-bold text-sm">${p.name}</h2>
+                            <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-xs">${p.price} руб. | В наличии: ${p.qty}</p>
                         </div>
-                        <button class="w-10 h-10 bg-green-500 rounded text-black font-bold text-xl" onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.qty})">+</button>
+                        <button class="w-10 h-10 bg-[var(--tg-theme-button-color,#2563eb)] rounded-xl text-[var(--tg-theme-button-text-color,#ffffff)] font-bold text-xl" onclick="addToCart(${p.id}, '${encodeURIComponent(p.name)}', ${p.price}, ${p.qty})">+</button>
                     </div>
                 `).join('');
-                
-                if (isAdmin) {
-                    document.querySelectorAll('[id^="del-"]').forEach(el => el.classList.remove('hidden'));
-                }
             } catch(e) { console.error(e); }
         }
 
-        window.addToCart = (id, name, price, maxQty) => {
-            let item = cart.find(i => i.id === id);
-            let currentQty = item ? item.qty : 0;
-
-            // ПРОВЕРКА: Если в корзине уже товаров столько же или больше, чем есть на складе
-            if (currentQty >= maxQty) {
-                alert("Больше этого товара нет в наличии!");
-                return; // Прерываем выполнение, ничего не добавляем
-            }
-
-            if (!item) {
-                cart.push({id, name, price, qty: 1});
-            } else {
-                item.qty++;
-            }
+        window.confirmDelete = (id) => {
+            tg.HapticFeedback.notificationOccurred("warning");
+            itemToDelete = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+        window.closeDeleteModal = () => { itemToDelete = null; document.getElementById('delete-modal').classList.add('hidden'); };
+        
+        window.executeDelete = async () => {
+            if (!itemToDelete) return;
+            document.getElementById('delete-modal').classList.add('hidden');
+            const res = await fetch(`${API_URL}/api/products/${itemToDelete}`, { method: 'DELETE', headers: { 'user-id': tg.initDataUnsafe?.user?.id, 'ngrok-skip-browser-warning': 'true' } });
             
-            // Вибрация при каждом успешном нажатии
+            if (res.ok) { 
+                tg.HapticFeedback.impactOccurred("heavy"); 
+                loadProducts(); 
+            } else { 
+                alert("Ошибка удаления"); 
+            }
+            itemToDelete = null;
+        };
+
+        window.addToCart = (id, encodedName, price, maxQty) => {
+            const name = decodeURIComponent(encodedName);
+            let item = cart.find(i => i.id === id);
+            if ((item ? item.qty : 0) >= maxQty) { alert("Товара больше нет!"); return; }
+            if (!item) cart.push({id, name, price, qty: 1}); else item.qty++;
             tg.HapticFeedback.impactOccurred("medium");
             updateCartUI();
         };
 
-        window.deleteProduct = async (id) => {
-            if (!confirm("Удалить товар из магазина?")) return;
-            try {
-                const response = await fetch(`${API_URL}/api/products/${id}`, { 
-                    method: 'DELETE',
-                    headers: { 'ngrok-skip-browser-warning': 'true' }
-                });
+        function updateCartUI() {
+            localStorage.setItem('saro_shop_cart', JSON.stringify(cart));
+            const count = cart.reduce((s, i) => s + i.qty, 0);
+            const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            document.getElementById('cart-count').innerText = count;
+            document.getElementById('cart-float').classList.toggle('hidden', count === 0);
+            
+            if(count > 0) {
+                tg.MainButton.setText(`🛒 Купить • ${total} ₽`);
+                tg.MainButton.show();
+            } else {
+                tg.MainButton.hide();
+            }
+        }
+
+        window.renderCart = () => {
+            const container = document.getElementById('cart-items');
+            container.innerHTML = cart.length === 0 ? '<p class="text-[var(--tg-theme-hint-color)]">Корзина пуста</p>' : cart.map(i => `<div class="flex justify-between bg-[var(--tg-theme-bg-color,#111827)] p-3 rounded items-center border border-[var(--tg-theme-secondary-bg-color,#374151)]"><span>${i.name} (x${i.qty})</span><button class="text-red-500" onclick="removeFromCart(${i.id})"><i class="fas fa-trash"></i></button></div>`).join('');
+        };
+        window.renderCartTotal = () => {
+            const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+            document.getElementById('cart-total').innerHTML = `<div class="text-xl font-bold text-[var(--tg-theme-button-color,#4ade80)] mt-4">Итого: ${total} ₽</div>`;
+        };
+
+        window.openCart = () => { document.getElementById('cart-modal').classList.remove('hidden'); renderCart(); renderCartTotal(); };
+        window.removeFromCart = (id) => { cart = cart.filter(i => i.id !== id); updateCartUI(); renderCart(); renderCartTotal(); };
+        window.closeCart = () => document.getElementById('cart-modal').classList.add('hidden');
+        
+        // --- ЗАКАЗ С НОВЫМ PAYLOAD ---
+        window.sendOrder = () => {
+            if(cart.length > 0) {
+                const phone = localStorage.getItem('saro_shop_phone') || "";
+                const address = localStorage.getItem('saro_shop_address') || "";
                 
-                if (response.ok) {
-                    loadProducts();
-                } else {
-                    alert("Ошибка при удалении товара.");
+                if(phone.length < 10 || address.length < 5) {
+                    alert("Пожалуйста, заполните телефон и адрес в Личном кабинете перед заказом!");
+                    closeCart();
+                    openProfile();
+                    return;
                 }
-            } catch (err) {
-                console.error("Ошибка сети:", err);
+
+                tg.MainButton.showProgress();
+                
+                setTimeout(() => {
+                    // Отправляем объект с корзиной, телефоном и адресом
+                    tg.sendData(JSON.stringify({ cart, phone, address }));
+                    
+                    cart = [];
+                    localStorage.removeItem('saro_shop_cart');
+                    updateCartUI();
+                    closeCart();
+                    tg.MainButton.hideProgress();
+                }, 500);
             }
         };
 
-        window.removeFromCart = (id) => {
-            cart = cart.filter(i => i.id !== id);
-            updateCartUI();
-            openCart();
+        tg.MainButton.offClick(window.sendOrder);
+        tg.MainButton.onClick(window.sendOrder);
+
+        // --- ПРОФИЛЬ И ВАЛИДАЦИЯ ---
+        window.openProfile = () => {
+            document.getElementById('profile-name').innerText = tg.initDataUnsafe?.user?.first_name || "Пользователь";
+            document.getElementById('profile-id').innerText = tg.initDataUnsafe?.user?.id || "---";
+            
+            document.getElementById('profile-phone').value = localStorage.getItem('saro_shop_phone') || "";
+            document.getElementById('profile-address').value = localStorage.getItem('saro_shop_address') || "";
+            
+            document.getElementById('profile-modal').classList.remove('hidden');
         };
+        
+        window.closeProfile = () => document.getElementById('profile-modal').classList.add('hidden');
 
-        function updateCartUI() {
-            const count = cart.reduce((s, i) => s + i.qty, 0);
-            document.getElementById('cart-count').innerText = count;
-            document.getElementById('cart-float').classList.toggle('hidden', count === 0);
-        }
-
-        window.openCart = () => {
-            document.getElementById('cart-modal').classList.remove('hidden');
-            const container = document.getElementById('cart-items');
-            container.innerHTML = cart.length === 0 ? '<p>Корзина пуста</p>' : cart.map(i => `
-                <div class="flex justify-between bg-gray-800 p-3 rounded items-center">
-                    <span>${i.name} (x${i.qty})</span>
-                    <button class="text-red-500" onclick="removeFromCart(${i.id})"><i class="fas fa-trash"></i></button>
-                </div>
-            `).join('');
-        };
-
-        window.closeCart = () => document.getElementById('cart-modal').classList.add('hidden');
-        window.sendOrder = () => {
-            if(cart.length > 0) tg.sendData(JSON.stringify(cart));
-            else alert("Корзина пуста");
+        window.saveProfileData = () => {
+            const phone = document.getElementById('profile-phone').value.trim();
+            const address = document.getElementById('profile-address').value.trim();
+            
+            if (phone.length < 10) {
+                alert("Введите корректный номер телефона");
+                return;
+            }
+            if (address.length < 5) {
+                alert("Введите полный адрес доставки");
+                return;
+            }
+            
+            localStorage.setItem('saro_shop_phone', phone);
+            localStorage.setItem('saro_shop_address', address);
+            
+            tg.HapticFeedback.notificationOccurred("success");
+            closeProfile();
         };
 
         initApp();
