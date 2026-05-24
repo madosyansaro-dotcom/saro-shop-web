@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saro Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="bg-gray-900 text-white p-4 font-sans">
+
+    <h1 class="text-2xl font-bold text-center text-green-400 mb-6">🛒 Продукты</h1>
+
+    <div class="space-y-4">
+        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
+            <div>
+                <h2 class="font-bold text-lg">Хлеб фермерский</h2>
+                <p class="text-gray-400 text-sm">Цена: 80 руб.</p>
+            </div>
+            <button class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" onclick="addToCart('Хлеб фермерский', 80)">+ Добавить</button>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
+            <div>
+                <h2 class="font-bold text-lg">Молоко 1л</h2>
+                <p class="text-gray-400 text-sm">Цена: 120 руб.</p>
+            </div>
+            <button class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" onclick="addToCart('Молоко 1л', 120)">+ Добавить</button>
+        </div>
+    </div>
+
+    <button id="checkoutBtn" class="w-full mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl hidden transition-all shadow-lg" onclick="sendOrder()">
+        Оформить заказ
+    </button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let cart = []; // Корзина
+        let checkoutBtn = document.getElementById('checkoutBtn');
+
+        function addToCart(name, price) {
+            let existing = cart.find(i => i.name === name);
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                cart.push({ name: name, price: price, qty: 1 });
+            }
+            
+            // Показываем кнопку оформления
+            checkoutBtn.style.display = 'block';
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function sendOrder() {
+            // Отправляем JSON корзины обратно в Python-бота
+            let dataString = JSON.stringify(cart);
+            tg.sendData(dataString); 
+        }
+    </script>
+</body>
+</html>
