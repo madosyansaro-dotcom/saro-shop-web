@@ -54,7 +54,7 @@
                 list.innerHTML = products.map(p => `
                     <div class="bg-gray-800 p-3 rounded-lg flex justify-between items-center border border-gray-700">
                         <div class="flex items-center gap-2">
-                            <button onclick="deleteProduct(${p.id})" class="text-red-500 w-8 h-8 ${isAdmin ? '' : 'hidden'}">
+                            <button id="del-${p.id}" onclick="deleteProduct(${p.id})" class="text-red-500 w-8 h-8 ${isAdmin ? '' : 'hidden'}">
                                 <i class="fas fa-trash"></i>
                             </button>
                             <div>
@@ -65,6 +65,11 @@
                         <button class="w-10 h-10 bg-green-500 rounded text-black font-bold text-xl" onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.qty})">+</button>
                     </div>
                 `).join('');
+                
+                // Принудительная проверка для iPhone:
+                if (isAdmin) {
+                    document.querySelectorAll('[id^="del-"]').forEach(el => el.classList.remove('hidden'));
+                }
             } catch(e) { console.error(e); }
         }
 
