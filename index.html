@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
-    <script src="config.js?v=16"></script> 
+    <script src="config.js?v=17"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -127,14 +127,22 @@
                 const res = await fetchWithRetry(API_URL + "/api/admins", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const admins = await res.json();
                 const userId = tg.initDataUnsafe?.user?.id;
+                
                 isAdmin = admins.map(String).includes(String(userId));
+                
+                // 🔥 ДИАГНОСТИКА: покажет, видит ли тебя Telegram 🔥
+                if (!isAdmin) {
+                    tg.showAlert(`Диагностика:\nТвой ID: ${userId}\nАдмины в БД: ${admins.join(', ')}`);
+                }
                 
                 if(isAdmin) {
                     document.getElementById('admin-toggle').classList.remove('hidden');
                 }
-            } catch(e) { console.error("Admin check failed", e); }
+            } catch(e) { 
+                console.error("Admin check failed", e); 
+                tg.showAlert("Бэкенд недоступен! Проверь, работает ли Python и правильная ли ссылка ngrok в config.js");
+            }
             
-            // 🔥 Вызов теперь с await 🔥
             await loadProducts();
         }
 
