@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
-    <script src="config.js?v=14"></script> 
+    <script src="config.js?v=16"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -17,11 +17,15 @@
 </head>
 <body class="bg-[var(--tg-theme-bg-color,#111827)] text-[var(--tg-theme-text-color,#ffffff)] p-4 font-sans select-none pb-20">
 
-    <div class="fixed top-4 left-4 z-50 bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-full shadow-lg text-[var(--tg-theme-button-color,#3b82f6)]" onclick="openProfile()">
+    <div class="fixed top-4 left-4 z-40 bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-full shadow-lg text-[var(--tg-theme-button-color,#3b82f6)]" onclick="openProfile()">
         <i class="fas fa-user"></i>
     </div>
 
-    <div id="cart-float" class="fixed top-4 right-4 z-50 bg-[var(--tg-theme-button-color,#2563eb)] p-3 rounded-full shadow-lg hidden text-[var(--tg-theme-button-text-color,#ffffff)]" onclick="openCart()">
+    <div id="admin-toggle" class="fixed top-20 left-4 mt-2 z-40 bg-red-600 p-3 rounded-full shadow-lg hidden text-white cursor-pointer transition-colors" onclick="toggleAdminMode()">
+        <i class="fas fa-hammer"></i>
+    </div>
+
+    <div id="cart-float" class="fixed top-4 right-4 z-40 bg-[var(--tg-theme-button-color,#2563eb)] p-3 rounded-full shadow-lg hidden text-[var(--tg-theme-button-text-color,#ffffff)]" onclick="openCart()">
         <i class="fas fa-shopping-cart"></i>
         <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-xs w-5 h-5 flex items-center justify-center rounded-full text-white">0</span>
     </div>
@@ -89,13 +93,13 @@
         tg.expand();
         
         let cart = [], isAdmin = false, itemToDelete = null;
-        let allProducts = []; // 🔥 Глобальный кэш товаров для поиска
+        let allProducts = [];
+        let adminEditMode = false;
 
         const escapeHTML = (str = '') => String(str).replace(/[&<>'"]/g, 
             tag => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'}[tag])
         );
 
-        // 🔥 NETWORK RETRY LOGIC 🔥
         async function fetchWithRetry(url, options = {}, retries = 3) {
             for (let i = 0; i < retries; i++) {
                 try {
@@ -104,7 +108,7 @@
                     return response;
                 } catch (err) {
                     if (i === retries - 1) throw err;
-                    await new Promise(res => setTimeout(res, 1000 * (i + 1))); // Экспоненциальная задержка
+                    await new Promise(res => setTimeout(res, 1000 * (i + 1)));
                 }
             }
         }
@@ -124,26 +128,47 @@
                 const admins = await res.json();
                 const userId = tg.initDataUnsafe?.user?.id;
                 isAdmin = admins.map(String).includes(String(userId));
+                
+                if(isAdmin) {
+                    document.getElementById('admin-toggle').classList.remove('hidden');
+                }
             } catch(e) { console.error("Admin check failed", e); }
-            loadProducts();
+            
+            // 🔥 Вызов теперь с await 🔥
+            await loadProducts();
         }
+
+        window.toggleAdminMode = () => {
+            adminEditMode = !adminEditMode;
+            tg.HapticFeedback.impactOccurred("medium");
+            
+            const btn = document.getElementById('admin-toggle');
+            if(adminEditMode) {
+                btn.classList.replace('bg-red-600', 'bg-green-500');
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+            } else {
+                btn.classList.replace('bg-green-500', 'bg-red-600');
+                btn.innerHTML = '<i class="fas fa-hammer"></i>';
+            }
+            renderProducts();
+        };
 
         async function loadProducts() {
             try {
                 const res = await fetchWithRetry(API_URL + "/api/products", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 allProducts = await res.json();
                 document.getElementById("loader").style.display = "none";
-                renderProducts(); // Рендерим после загрузки
+                renderProducts();
             } catch(e) { 
                 console.error(e); 
                 document.getElementById("loader").innerHTML = `<div class="text-center text-red-500 py-10">Ошибка загрузки сети. Попробуйте позже.</div>`;
             }
         }
 
-        // 🔥 ФУНКЦИЯ РЕНДЕРА (С УЧЕТОМ ПОИСКА) 🔥
         window.renderProducts = () => {
             const query = document.getElementById('search-input').value.toLowerCase().trim();
-            const filteredProducts = allProducts.filter(p => p.name.toLowerCase().includes(query));
+            // 🔥 Защита от undefined в поиске 🔥
+            const filteredProducts = allProducts.filter(p => String(p.name || '').toLowerCase().includes(query));
             const listEl = document.getElementById('products-list');
 
             if(filteredProducts.length === 0) {
@@ -152,9 +177,15 @@
             }
             
             listEl.innerHTML = filteredProducts.map(p => `
-                <div class="relative bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-2xl flex justify-between items-center border border-[var(--tg-theme-bg-color,#374151)] ${isAdmin ? 'admin-edit' : ''}">
-                    ${isAdmin ? `<button onclick="confirmDelete(${p.id})" class="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg border border-red-300 active:scale-90 z-10"><i class="fas fa-minus text-xs"></i></button>` : ''}
-                    <div class="ml-2">
+                <div class="relative bg-[var(--tg-theme-secondary-bg-color,#1f2937)] p-3 rounded-2xl flex justify-between items-center border border-[var(--tg-theme-bg-color,#374151)] ${isAdmin && adminEditMode ? 'admin-edit' : ''}">
+                    
+                    ${isAdmin && adminEditMode ? `
+                        <button onclick="confirmDelete(${p.id})" class="absolute top-2 left-2 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg border border-red-300 active:scale-90 z-10">
+                            <i class="fas fa-minus text-xs"></i>
+                        </button>
+                    ` : ''}
+
+                    <div class="ml-2 ${isAdmin && adminEditMode ? 'pl-8' : ''}">
                         <h2 class="font-bold text-sm">${escapeHTML(p.name)}</h2>
                         <p class="text-[var(--tg-theme-hint-color,#9ca3af)] text-xs">${p.price} руб. | В наличии: ${p.qty}</p>
                     </div>
@@ -178,7 +209,7 @@
                 const res = await fetchWithRetry(`${API_URL}/api/products/${itemToDelete}`, { method: 'DELETE', headers: { 'user-id': tg.initDataUnsafe?.user?.id, 'ngrok-skip-browser-warning': 'true' } });
                 if (res.ok) { 
                     tg.HapticFeedback.impactOccurred("heavy"); 
-                    loadProducts(); 
+                    await loadProducts(); 
                 } else { 
                     tg.showAlert("Ошибка удаления (отказ сервера)"); 
                 }
