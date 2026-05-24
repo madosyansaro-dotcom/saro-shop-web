@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saro Shop</title>
+    <script src="config.js"></script> 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -31,13 +32,14 @@
     <script>
         const tg = window.Telegram.WebApp; 
         tg.expand();
-        const NGROK_URL = "https://sappiness-lyrically-icky.ngrok-free.dev"; 
+        
         let cart = [], isAdmin = false;
 
         async function initApp() {
             await new Promise(resolve => setTimeout(resolve, 500));
             try {
-                const res = await fetch(NGROK_URL + "/api/admins", { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                // Используем API_URL из config.js
+                const res = await fetch(API_URL + "/api/admins", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const admins = await res.json();
                 const userId = tg.initDataUnsafe?.user?.id;
                 isAdmin = admins.map(String).includes(String(userId));
@@ -47,7 +49,7 @@
 
         async function loadProducts() {
             try {
-                const res = await fetch(NGROK_URL + "/api/products", { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                const res = await fetch(API_URL + "/api/products", { headers: { 'ngrok-skip-browser-warning': 'true' } });
                 const products = await res.json();
                 const list = document.getElementById('products-list');
                 
@@ -66,7 +68,6 @@
                     </div>
                 `).join('');
                 
-                // Принудительная проверка для iPhone:
                 if (isAdmin) {
                     document.querySelectorAll('[id^="del-"]').forEach(el => el.classList.remove('hidden'));
                 }
@@ -83,8 +84,7 @@
         window.deleteProduct = async (id) => {
             if (!confirm("Удалить товар из магазина?")) return;
             try {
-                // Добавляем заголовок 'ngrok-skip-browser-warning' и принудительный режим
-                const response = await fetch(`${NGROK_URL}/api/products/${id}`, { 
+                const response = await fetch(`${API_URL}/api/products/${id}`, { 
                     method: 'DELETE',
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
