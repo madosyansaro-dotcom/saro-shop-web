@@ -6,108 +6,122 @@
     <title>Saro Shop</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body class="bg-gray-900 text-white p-4 font-sans">
+<body class="bg-gray-900 text-white p-4 font-sans select-none">
 
     <h1 class="text-2xl font-bold text-center text-green-400 mb-6">🛒 Продукты</h1>
 
     <div id="products-list" class="space-y-4">
-        <p class="text-center text-gray-400 animate-pulse">Загрузка товаров из базы...</p>
+        <p class="text-center text-gray-400">Загрузка...</p>
     </div>
 
-    <button id="checkoutBtn" class="w-full mt-8 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl hidden transition-all shadow-lg" onclick="sendOrder()">
+    <button id="checkoutBtn" class="w-full mt-8 bg-blue-600 text-white font-bold py-4 rounded-xl hidden shadow-lg" onclick="sendOrder()">
         Оформить заказ на <span id="totalPrice">0</span> руб.
     </button>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-
-        // 🔥 ССЫЛКА ОТ NGROK
+        
         const NGROK_URL = "https://sappiness-lyrically-icky.ngrok-free.dev"; 
+        let cart = [];
+        let isAdmin = false;
 
-        let cart = []; 
-        let checkoutBtn = document.getElementById('checkoutBtn');
-        let totalPriceSpan = document.getElementById('totalPrice');
+        async function initApp() {
+            // Узнаем, админ ли текущий пользователь
+            try {
+                const res = await fetch(NGROK_URL + "/api/admins");
+                const admins = await res.json();
+                const userId = tg.initDataUnsafe.user.id;
+                isAdmin = admins.includes(userId);
+            } catch (e) { console.error("Admin check failed"); }
+            
+            loadProducts();
+        }
 
         async function loadProducts() {
             try {
                 const response = await fetch(NGROK_URL + "/api/products", {
-                    method: 'GET',
                     headers: { 'ngrok-skip-browser-warning': 'true' }
                 });
                 const products = await response.json();
-                
                 const container = document.getElementById('products-list');
-                container.innerHTML = ''; 
-
-                if (products.length === 0) {
-                    container.innerHTML = '<p class="text-center text-gray-400">Товаров пока нет.</p>';
-                    return;
-                }
+                container.innerHTML = '';
 
                 products.forEach(p => {
+                    let isOut = p.qty <= 0;
+                    
                     container.innerHTML += `
-                        <div class="bg-gray-800 p-4 rounded-xl flex justify-between items-center shadow-lg border border-gray-700">
+                        <div class="relative bg-gray-800 p-4 rounded-xl flex justify-between items-center border border-gray-700 shadow-md">
+                            ${isAdmin ? `<button onclick="deleteProduct(${p.id})" class="absolute -top-2 -left-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-lg"><i class="fas fa-minus"></i></button>` : ''}
                             <div>
                                 <h2 class="font-bold text-lg">${p.name}</h2>
-                                <p class="text-gray-400 text-sm">Цена: ${p.price} руб.</p>
-                                <p class="text-gray-500 text-xs">Доступно: <span id="stock-${p.name}">${p.qty}</span> шт.</p>
+                                <p class="text-gray-400 text-sm">${p.price} руб.</p>
+                                <p class="text-gray-500 text-xs">В наличии: <span id="stock-${p.id}">${p.qty}</span></p>
                             </div>
-                            <button id="btn-${p.name}" class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-2 rounded-lg transition-colors" 
-                                onclick="addToCart('${p.name}', ${p.price}, ${p.qty})">+ Добавить</button>
+                            <button id="btn-${p.id}" 
+                                onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.qty})"
+                                class="px-4 py-2 rounded-lg font-bold transition-all ${isOut ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 text-black active:scale-95'}"
+                                ${isOut ? 'disabled' : ''}>
+                                ${isOut ? 'Пусто' : '+ Добавить'}
+                            </button>
                         </div>
                     `;
                 });
-            } catch (error) {
-                document.getElementById('products-list').innerHTML = '<p class="text-center text-red-500">Ошибка связи с сервером.</p>';
+            } catch (e) { container.innerHTML = "Ошибка связи."; }
+        }
+
+        function addToCart(id, name, price, maxQty) {
+            let item = cart.find(i => i.id === id);
+            let currentQty = item ? item.qty : 0;
+
+            if (currentQty < maxQty) {
+                if (item) { item.qty++; } else { cart.push({id, name, price, qty: 1}); }
+                
+                // Уменьшаем число на экране
+                let stockSpan = document.getElementById(`stock-${id}`);
+                let btn = document.getElementById(`btn-${id}`);
+                let remaining = maxQty - (currentQty + 1);
+                stockSpan.innerText = remaining;
+
+                // Если стало 0 - гасим кнопку
+                if (remaining <= 0) {
+                    btn.disabled = true;
+                    btn.className = "px-4 py-2 rounded-lg font-bold bg-gray-600 text-gray-400 cursor-not-allowed";
+                    btn.innerText = "Максимум";
+                }
+
+                updateTotal();
+                tg.HapticFeedback.impactOccurred('medium');
             }
         }
 
-        function addToCart(name, price, maxQty) {
-            let existing = cart.find(i => i.name === name);
-            
-            if (existing) {
-                // Если пользователь пытается добавить больше, чем есть на складе — блокируем!
-                if (existing.qty >= maxQty) {
-                    alert(`Извините, нельзя заказать больше ${maxQty} шт. этого товара!`);
-                    tg.HapticFeedback.notificationOccurred('error'); // Телефон завибрирует об ошибке
-                    return;
-                }
-                existing.qty += 1;
-            } else {
-                if (maxQty <= 0) {
-                    alert("Этого товара нет в наличии!");
-                    return;
-                }
-                cart.push({ name: name, price: price, qty: 1 });
-            }
-            
-            // Визуально уменьшаем доступное количество на экране витрины
-            let stockSpan = document.getElementById(`stock-${name}`);
-            if (stockSpan) {
-                let currentStock = parseInt(stockSpan.innerText);
-                stockSpan.innerText = currentStock - 1;
-            }
-
-            updateCheckoutButton();
-            tg.HapticFeedback.impactOccurred('light');
+        async function deleteProduct(id) {
+            if (!confirm("Удалить этот товар совсем?")) return;
+            try {
+                await fetch(`${NGROK_URL}/api/products/${id}`, { method: 'DELETE' });
+                loadProducts(); // Перезагружаем список
+                tg.HapticFeedback.notificationOccurred('success');
+            } catch (e) { alert("Не удалось удалить"); }
         }
 
-        function updateCheckoutButton() {
-            let total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        function updateTotal() {
+            let total = cart.reduce((s, i) => s + (i.price * i.qty), 0);
+            const checkBtn = document.getElementById('checkoutBtn');
+            const totalSpan = document.getElementById('totalPrice');
+            
             if (total > 0) {
-                checkoutBtn.style.display = 'block';
-                totalPriceSpan.innerText = total;
+                checkBtn.classList.remove('hidden');
+                totalSpan.innerText = total;
             }
         }
 
         function sendOrder() {
-            let dataString = JSON.stringify(cart);
-            tg.sendData(dataString); 
+            tg.sendData(json.stringify(cart));
         }
 
-        loadProducts();
+        initApp();
     </script>
 </body>
 </html>
